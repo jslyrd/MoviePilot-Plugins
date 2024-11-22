@@ -38,7 +38,7 @@ class LatestMovements(_PluginBase):
     # 插件图标
     plugin_icon = "Chrome_A.png"
     # 插件版本
-    plugin_version = "0.6"
+    plugin_version = "0.7"
     # 插件作者
     plugin_author = "jslyrd"
     # 作者主页
@@ -512,7 +512,7 @@ class LatestMovements(_PluginBase):
         # 执行任务
         logger.info(f"开始执行{type_str}任务 ...")
         status = self.login_site(do_sites)
-
+        logger.info(f"执行{type_str}任务结束，任务结果：{status} ...")
         if status:
             logger.info(f"站点{type_str}任务完成！")
             # 获取今天的日期
@@ -533,6 +533,7 @@ class LatestMovements(_PluginBase):
                 } for s in status]
             # 保存数据
             self.save_data(key, today_data)
+            logger.info(f"保存任务结果：{key,today_data} ...")
 
             
             # 更新动向成功
@@ -628,8 +629,8 @@ class LatestMovements(_PluginBase):
                 token       = site_info.get("token")
                 url         = site_info.get("url")
                 name        = site_info.get("name")
-                if not url or not cookie:
-                    logger.warn(f"未配置 {name} 的站点地址或Cookie，无法签到")
+                if not (url and (cookie or token)):
+                    logger.warn(f"未配置 {name} 的站点地址或Cookie或token，无法签到")
                     continue
                 try:
                     logger.info(f"开始站点操作：{name}，添加ua、代理、cookie...")
@@ -661,7 +662,8 @@ class LatestMovements(_PluginBase):
                         else:
                             result.append({'site':name,'status':f"未登录，Cookie或token已失效！"})
                             logger.warn(f"站点 {name} 未登录，Cookie或token已失效！")
-                    else:
+                    else:                        
+                        logger.info(f"站点模拟登录成功：{name}，开始访问个人主页...")
                         # return True, "模拟登录成功"
                         # 点击个人信息
                         if token:
@@ -685,23 +687,26 @@ class LatestMovements(_PluginBase):
                             else:
                                 result.append({'site':name,'status':f"最近动向中未找到内容"})
                         else:
-                            result.append({'site':name,'status':f"页面中没有最近动向元素"})'''
-                        
+                            result.append({'site':name,'status':f"页面中没有最近动向元素"})'''                        
+                        logger.info(f"开始获取最近动向...")
                         # 查找包含特定文本的节点
                         texts = ['最近動向', '最近动向', '最近活跃']
                         target_element = None                        
                         for text in texts:
                             try:
                                 target_element = page.query_selector(f'*:text("{text}")')
-                                if target_element:
+                                if target_element:                                    
+                                    logger.info(f"查找最近动向元素成功：{name}...")
                                     break
                             except Exception as e:
                                 # 忽略未找到元素的异常，继续尝试下一个文本
                                 pass                        
                         if not target_element:
                             result.append({'site':name,'status':f"页面中没有最近动向元素"})
+                            logger.info(f"页面中没有最近动向元素...")
                         else:
                         # 获取下一个兄弟节点并输出其文本内容
+                            logger.info(f"提取最近动向...")
                             try:
                                 next_sibling = target_element.next_element_sibling()
                                 if next_sibling:
