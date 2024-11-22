@@ -38,7 +38,7 @@ class LatestMovements(_PluginBase):
     # 插件图标
     plugin_icon = "Chrome_A.png"
     # 插件版本
-    plugin_version = "0.3"
+    plugin_version = "0.4"
     # 插件作者
     plugin_author = "jslyrd"
     # 作者主页
@@ -635,13 +635,13 @@ class LatestMovements(_PluginBase):
                     logger.info(f"开始站点操作：{name}，添加ua、代理、cookie...")
                     context = webkit.new_context(user_agent=ua, 
                                                 proxy=settings.PROXY_SERVER if is_proxy else None)  # 需要创建一个 context 上下文
+                    page = context.new_page()  # 创建一个新的页面   
                     if cookie:
                         page.set_extra_http_headers({"cookie": cookie})
                     if token:
                         page.set_extra_http_headers({"Authorization": token})
                         
                     # context.add_cookies(site_info.get("cookie"))
-                    page = context.new_page()  # 创建一个新的页面   
                     page.route(re.compile(r"(\.png)|(\.jpg)"), lambda route: route.abort())         # 不加载图片
                     logger.info(f"开始站点模拟登录：{name}，地址：{url}...")
                     

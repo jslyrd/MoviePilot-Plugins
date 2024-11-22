@@ -3,11 +3,12 @@
         "name": "刷新站点最近动向",
         "description": "强制使用浏览器模拟登录并查看最近动向，希望能达到登录的目的。大部分代码重用自thsrite的autosignin（站点自动签到）插件",
         "labels": "站点",
-        "version": "0.3",
+        "version": "0.4",
         "icon": "Chrome_A.png",
         "author": "thsrite,jslyrd",
         "level": 2,
         "history": {
+            "v0.3": "MoviePilot V2 刷新站点最近动向0.3",
             "v0.2": "MoviePilot V2 刷新站点最近动向.2",
             "v0.1": "MoviePilot V2 刷新站点最近动向"
         }
