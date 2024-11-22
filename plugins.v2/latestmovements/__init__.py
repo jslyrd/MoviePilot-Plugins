@@ -107,10 +107,10 @@ class LatestMovements(_PluginBase):
             if self._onlyonce:
                 # 定时服务
                 self._scheduler = BackgroundScheduler(timezone=settings.TZ)
-                logger.info("站点自动签到服务启动，立即运行一次")
+                logger.info("站点更新最近动向服务启动，立即运行一次")
                 self._scheduler.add_job(func=self.sign_in, trigger='date',
                                         run_date=datetime.now(tz=pytz.timezone(settings.TZ)) + timedelta(seconds=3),
-                                        name="站点自动签到")
+                                        name="站点更新最近动向")
 
                 # 关闭一次性开关
                 self._onlyonce = False
@@ -483,7 +483,7 @@ class LatestMovements(_PluginBase):
 
         # 今日没数据
         if not today_history or self._clean:
-            logger.info(f"今日 {today} 未{type_str}，开始{type_str}已选站点")
+            logger.info(f"今日 {today} 未{type_str}，开始对已选站点进行{type_str}")
             if self._clean:
                 # 关闭开关
                 self._clean = False
@@ -612,11 +612,13 @@ class LatestMovements(_PluginBase):
         :param site_info: 站点信息
         :return: 签到结果信息
         """
+        logger.info(f"启动浏览器，本次更新动向的站点为：{str(do_sites)}")
         result = []
-        pw =  playwright().start()                      # 不使用with，有效防止内存爆炸
-        webkit = pw.chromium.launch(headless=True, channel='chromium')        # headless=False表示无头模式 
         try:  
+            pw =  playwright().start()                      # 不使用with，有效防止内存爆炸
+            webkit = pw.chromium.launch(headless=True, channel='chromium')        # headless=False表示无头模式 
             for site_info in do_sites:
+                logger.info(f"轮询站点：{str(site_info)}")
                 if not site_info:
                     continue
                 ua          = site_info.get("ua")
@@ -700,7 +702,8 @@ class LatestMovements(_PluginBase):
         except Exception as es:
             logger.warn(f"发生错误，任务中止：", es)
         finally:
-            webkit.close()
+            webkit.close()        
+        logger.info(f"浏览器操作完成...")
         return result
 
     def stop_service(self):
