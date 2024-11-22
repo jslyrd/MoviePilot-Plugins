@@ -38,7 +38,7 @@ class LatestMovements(_PluginBase):
     # 插件图标
     plugin_icon = "Chrome_A.png"
     # 插件版本
-    plugin_version = "0.2"
+    plugin_version = "0.3"
     # 插件作者
     plugin_author = "jslyrd"
     # 作者主页
@@ -618,8 +618,9 @@ class LatestMovements(_PluginBase):
             pw =  playwright().start()                      # 不使用with，有效防止内存爆炸
             webkit = pw.chromium.launch(headless=True, channel='chromium')        # headless=False表示无头模式 
             for site_info in do_sites:
-                logger.info(f"轮询站点：{str(site_info)}")
+                logger.info(f"轮询站点：{site_info.get('name')}")
                 if not site_info:
+                    logger.warn(f"站点 {site_info.get('name')} 信息不存在，跳过...")
                     continue
                 ua          = site_info.get("ua")
                 is_proxy    = site_info.get("proxy")
@@ -631,6 +632,7 @@ class LatestMovements(_PluginBase):
                     logger.warn(f"未配置 {name} 的站点地址或Cookie，无法签到")
                     continue
                 try:
+                    logger.info(f"开始站点操作：{name}，添加ua、代理、cookie...")
                     context = webkit.new_context(user_agent=ua, 
                                                 proxy=settings.PROXY_SERVER if is_proxy else None)  # 需要创建一个 context 上下文
                     if cookie:
@@ -703,7 +705,7 @@ class LatestMovements(_PluginBase):
             logger.warn(f"发生错误，任务中止：", es)
         finally:
             webkit.close()        
-        logger.info(f"浏览器操作完成...")
+        logger.info(f"浏览器操作完成...获取结果：{result}")
         return result
 
     def stop_service(self):
