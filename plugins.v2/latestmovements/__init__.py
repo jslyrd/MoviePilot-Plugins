@@ -1,35 +1,33 @@
 import re
-import traceback
+# import traceback
 from datetime import datetime, timedelta
-from multiprocessing.dummy import Pool as ThreadPool
-from multiprocessing.pool import ThreadPool
+# from multiprocessing.dummy import Pool as ThreadPool
+# from multiprocessing.pool import ThreadPool
 from typing import Any, List, Dict, Tuple, Optional
-from urllib.parse import urljoin
+# from urllib.parse import urljoin
 
 from playwright.sync_api import sync_playwright as playwright   # pip install playwright && python -m playwright install
-import time
+from cf_clearance import sync_cf_retry, sync_stealth
 
 import pytz
 from apscheduler.schedulers.background import BackgroundScheduler
 from apscheduler.triggers.cron import CronTrigger
-from ruamel.yaml import CommentedMap
+# from ruamel.yaml import CommentedMap
 
-from app import schemas
+# from app import schemas
 from app.chain.site import SiteChain
 from app.core.config import settings
 from app.core.event import EventManager, eventmanager, Event
 from app.db.site_oper import SiteOper
-from app.helper.browser import PlaywrightHelper
 from app.helper.cloudflare import under_challenge
 from app.helper.module import ModuleHelper
 from app.helper.sites import SitesHelper
 from app.log import logger
 from app.plugins import _PluginBase
 from app.schemas.types import EventType, NotificationType
-from app.utils.http import RequestUtils
 from app.utils.site import SiteUtils
-from app.utils.string import StringUtils
-from app.utils.timer import TimerUtils
+# from app.utils.string import StringUtils
+# from app.utils.timer import TimerUtils
 
 
 class LatestMovements(_PluginBase):
@@ -102,7 +100,7 @@ class LatestMovements(_PluginBase):
         # 加载模块
         if self._enabled or self._onlyonce:
 
-            self._site_schema = ModuleHelper.load('app.plugins.autosignin.sites',
+            self._site_schema = ModuleHelper.load('app.plugins.latestmovements.sites',
                                                   filter_func=lambda _, obj: hasattr(obj, 'match'))
 
             # 立即运行一次
@@ -142,7 +140,19 @@ class LatestMovements(_PluginBase):
 
     @staticmethod
     def get_command() -> List[Dict[str, Any]]:
-        pass
+        """
+        定义远程控制命令
+        :return: 命令关键字、事件、描述、附带数据
+        """
+        return [{
+            "cmd": "/latest_movements",
+            "event": EventType.PluginAction,
+            "desc": "更新站点动向",
+            "category": "站点",
+            "data": {
+                "action": "latest_movements"
+            }
+        }]
 
     def get_api(self) -> List[Dict[str, Any]]:
         pass
@@ -162,70 +172,18 @@ class LatestMovements(_PluginBase):
             try:
                 if str(self._cron).strip().count(" ") == 4:
                     return [{
-                        "id": "AutoSignIn",
-                        "name": "站点自动签到服务",
+                        "id": "latestmovements",
+                        "name": "更新站点动向服务",
                         "trigger": CronTrigger.from_crontab(self._cron),
                         "func": self.sign_in,
                         "kwargs": {}
                     }]
                 else:
-                    # 2.3/9-23
-                    crons = str(self._cron).strip().split("/")
-                    if len(crons) == 2:
-                        # 2.3
-                        cron = crons[0]
-                        # 9-23
-                        times = crons[1].split("-")
-                        if len(times) == 2:
-                            # 9
-                            self._start_time = int(times[0])
-                            # 23
-                            self._end_time = int(times[1])
-                        if self._start_time and self._end_time:
-                            return [{
-                                "id": "AutoSignIn",
-                                "name": "站点自动签到服务",
-                                "trigger": "interval",
-                                "func": self.sign_in,
-                                "kwargs": {
-                                    "hours": float(str(cron).strip()),
-                                }
-                            }]
-                        else:
-                            logger.error("站点自动签到服务启动失败，周期格式错误")
-                    else:
-                        # 默认0-24 按照周期运行
-                        return [{
-                            "id": "AutoSignIn",
-                            "name": "站点自动签到服务",
-                            "trigger": "interval",
-                            "func": self.sign_in,
-                            "kwargs": {
-                                "hours": float(str(self._cron).strip()),
-                            }
-                        }]
+                    logger.error("更新站点动向服务启动失败，周期格式错误")                    
             except Exception as err:
                 logger.error(f"定时任务配置错误：{str(err)}")
         elif self._enabled:
-            # 随机时间
-            triggers = TimerUtils.random_scheduler(num_executions=2,
-                                                   begin_hour=9,
-                                                   end_hour=23,
-                                                   max_interval=6 * 60,
-                                                   min_interval=2 * 60)
-            ret_jobs = []
-            for trigger in triggers:
-                ret_jobs.append({
-                    "id": f"AutoSignIn|{trigger.hour}:{trigger.minute}",
-                    "name": "站点自动签到服务",
-                    "trigger": "cron",
-                    "func": self.sign_in,
-                    "kwargs": {
-                        "hour": trigger.hour,
-                        "minute": trigger.minute
-                    }
-                })
-            return ret_jobs
+            logger.error("更新站点动向服务启动失败，请填写周期格式")
         return []
 
     def get_form(self) -> Tuple[List[dict], Dict[str, Any]]:
@@ -293,22 +251,6 @@ class LatestMovements(_PluginBase):
                                         }
                                     }
                                 ]
-                            },
-                            {
-                                'component': 'VCol',
-                                'props': {
-                                    'cols': 12,
-                                    'md': 3
-                                },
-                                'content': [
-                                    {
-                                        'component': 'VSwitch',
-                                        'props': {
-                                            'model': 'clean',
-                                            'label': '清理本日缓存',
-                                        }
-                                    }
-                                ]
                             }
                         ]
                     },
@@ -327,7 +269,7 @@ class LatestMovements(_PluginBase):
                                         'props': {
                                             'model': 'cron',
                                             'label': '执行周期',
-                                            'placeholder': '5位cron表达式，留空自动'
+                                            'placeholder': '5位cron表达式，必填'
                                         }
                                     }
                                 ]
@@ -346,7 +288,7 @@ class LatestMovements(_PluginBase):
                                             'chips': True,
                                             'multiple': True,
                                             'model': 'login_sites',
-                                            'label': '登录站点',
+                                            'label': '更新站点',
                                             'items': site_options
                                         }
                                     }
@@ -368,11 +310,7 @@ class LatestMovements(_PluginBase):
                                         'props': {
                                             'type': 'info',
                                             'variant': 'tonal',
-                                            'text': '执行周期支持：'
-                                                    '1、5位cron表达式；'
-                                                    '2、配置间隔（小时），如2.3/9-23（9-23点之间每隔2.3小时执行一次）；'
-                                                    '3、周期不填默认9-23点随机执行2次。'
-                                                    '每天首次全量执行，其余执行命中重试关键词的站点。'
+                                            'text': '执行周期仅支持：5位cron表达式！'
                                         }
                                     }
                                 ]
@@ -499,19 +437,19 @@ class LatestMovements(_PluginBase):
 
     def sign_in(self, event: Event = None):
         """
-        自动签到|模拟登录
+        更新站点动向服务
         """
         if event:
             event_data = event.event_data
-            if not event_data or event_data.get("action") != "site_signin":
+            if not event_data or event_data.get("action") != "latest_movements":
                 return
         # 日期
         today = datetime.today()
-        if self._start_time and self._end_time:
+        '''if self._start_time and self._end_time:
             if int(datetime.today().hour) < self._start_time or int(datetime.today().hour) > self._end_time:
                 logger.error(
                     f"当前时间 {int(datetime.today().hour)} 不在 {self._start_time}-{self._end_time} 范围内，暂不执行任务")
-                return
+                return'''
         if event:
             logger.info("收到命令，开始更新最近动向 ...")
             self.post_message(channel=event.event_data.get("channel"),
@@ -523,7 +461,7 @@ class LatestMovements(_PluginBase):
 
     def __do(self, today: datetime, type_str: str, do_sites: list, event: Event = None):
         """
-        签到逻辑
+        更新站点动向逻辑
         """
         yesterday = today - timedelta(days=1)
         yesterday_str = yesterday.strftime('%Y-%m-%d')
@@ -549,7 +487,7 @@ class LatestMovements(_PluginBase):
             if self._clean:
                 # 关闭开关
                 self._clean = False
-        else:
+        '''else:
             # 需要重试站点
             retry_sites = today_history.get("retry") or []
             # 今天已签到|登录站点
@@ -565,20 +503,15 @@ class LatestMovements(_PluginBase):
 
             # 任务站点 = 需要重试+今日未do
             do_sites = no_sites
-            logger.info(f"今日 {today} 已{type_str}，开始重试命中关键词站点")
+            logger.info(f"今日 {today} 已{type_str}，开始重试命中关键词站点")'''
 
         if not do_sites:
             logger.info(f"没有需要{type_str}的站点")
             return
 
-        # 执行签到
+        # 执行任务
         logger.info(f"开始执行{type_str}任务 ...")
-        if type_str == "签到":
-            with ThreadPool(min(len(do_sites), 5)) as p:
-                status = p.map(self.signin_site, do_sites)
-        else:
-            with ThreadPool(min(len(do_sites), 5)) as p:
-                status = p.map(self.login_site, do_sites)
+        status = self.login_site(do_sites)
 
         if status:
             logger.info(f"站点{type_str}任务完成！")
@@ -601,41 +534,23 @@ class LatestMovements(_PluginBase):
             # 保存数据
             self.save_data(key, today_data)
 
-            # 命中重试词的站点id
-            retry_sites = []
-            # 命中重试词的站点签到msg
-            retry_msg = []
-            # 登录成功
+            
+            # 更新动向成功
             login_success_msg = []
-            # 签到成功
-            sign_success_msg = []
-            # 已签到
-            already_sign_msg = []
-            # 仿真签到成功
-            fz_sign_msg = []
             # 失败｜错误
             failed_msg = []
 
             for s in status:
 
-                if "登录成功" in str(s):
+                if "成功" in str(s):
                     login_success_msg.append(s)
-                elif "仿真签到成功" in str(s):
-                    fz_sign_msg.append(s)
-                    continue
-                elif "签到成功" in str(s):
-                    sign_success_msg.append(s)
-                elif '已签到' in str(s):
-                    already_sign_msg.append(s)
                 else:
                     failed_msg.append(s)
 
             # 发送通知
             if self._notify:
                 # 签到详细信息 登录成功、签到成功、已签到、仿真签到成功、失败--命中重试
-                signin_message = login_success_msg + sign_success_msg + already_sign_msg + fz_sign_msg + failed_msg
-                if len(retry_msg) > 0:
-                    signin_message += retry_msg
+                signin_message = login_success_msg + failed_msg
 
                 signin_message = "\n".join([f'【{s[0]}】{s[1]}' for s in signin_message if s])
                 self.post_message(title=f"【站点自动{type_str}】",
@@ -663,10 +578,10 @@ class LatestMovements(_PluginBase):
                 logger.error("站点模块加载失败：%s" % str(e))
         return None
 
-    def login_site(self, site_info: CommentedMap) -> Tuple[str, str]:
+    def login_site(self, do_sites: list) -> list:
         """
         模拟登录一个站点
-        """
+        
         site_module = self.__build_class(site_info.get("url"))
         # 开始记时
         start_time = datetime.now()
@@ -686,129 +601,107 @@ class LatestMovements(_PluginBase):
         else:
             self.siteoper.fail(domain)
         return site_info.get("name"), message
+        """
+        return self.__login_base(do_sites)
 
     @staticmethod
-    def __login_base(do_sites: list) -> Tuple[bool, str]: # , site_info: CommentedMap
+    def __login_base(do_sites: list) -> list: # , site_info: CommentedMap
         """
         更新最近动向通用处理
         :param do_sites: 站点列表
         :param site_info: 站点信息
         :return: 签到结果信息
         """
-        
-        try:
-            pw =  playwright().start()                      # 不使用with，有效防止内存爆炸
-            webkit = pw.chromium.launch(headless=True, channel='chromium')        # headless=False表示无头模式   
+        result = []
+        pw =  playwright().start()                      # 不使用with，有效防止内存爆炸
+        webkit = pw.chromium.launch(headless=True, channel='chromium')        # headless=False表示无头模式 
+        try:  
             for site_info in do_sites:
-                context = webkit.new_context(user_agent=site_info.get("ua"), 
-                                             proxy=settings.PROXY_SERVER if site_info.get("proxy") else None)  # 需要创建一个 context 上下文
-                if site_info.get("cookie"):
-                    page.set_extra_http_headers({"cookie": site_info.get("cookie")})
-                if site_info.get("token"):
-                    page.set_extra_http_headers({"Authorization": site_info.get("token")})
+                if not site_info:
+                    continue
+                ua          = site_info.get("ua")
+                is_proxy    = site_info.get("proxy")
+                cookie      = site_info.get("cookie")
+                token       = site_info.get("token")
+                url         = site_info.get("url")
+                name        = site_info.get("name")
+                if not url or not cookie:
+                    logger.warn(f"未配置 {name} 的站点地址或Cookie，无法签到")
+                    continue
+                try:
+                    context = webkit.new_context(user_agent=ua, 
+                                                proxy=settings.PROXY_SERVER if is_proxy else None)  # 需要创建一个 context 上下文
+                    if cookie:
+                        page.set_extra_http_headers({"cookie": cookie})
+                    if token:
+                        page.set_extra_http_headers({"Authorization": token})
+                        
+                    # context.add_cookies(site_info.get("cookie"))
+                    page = context.new_page()  # 创建一个新的页面   
+                    page.route(re.compile(r"(\.png)|(\.jpg)"), lambda route: route.abort())         # 不加载图片
+                    logger.info(f"开始站点模拟登录：{name}，地址：{url}...")
                     
-                # context.add_cookies(site_info.get("cookie"))
-                page = context.new_page()  # 创建一个新的页面   
-                # page.route(re.compile(r"(\.png)|(\.jpg)"), lambda route: route.abort())         # 不加载图片
-                page.goto(site_info.get("url"))
-                page.wait_for_load_state('networkidle')
-                # 点击个人信息
-                if site_info.get("token"):
-                    page.query_selector('a[href^="/profile/detail/"]').click()
-                    # 查找包含"最近動向"的<tr>元素
-                    recent_tr = page.query_selector('tr:has(td:has-text("最近動向"))')
-                    if recent_tr:
-                        # 获取该行中第二个<td>的文本内容
-                        recent_time = recent_tr.query_selector('td:nth-of-type(2)').text_content()
-                        print(f'最近动向时间: {recent_time}')
-
-                else:
-                    page.query_selector('a.User_Name, a.ExtremeUser_Name').click()
-                    # 查找包含“最近动向”的tr标签
-                    recent_tr = page.query_selector('tr:has(td.rowhead:has-text("最近动向"))')
-                    if recent_tr:
-                        # 获取最近动向的时间
-                        recent_time = recent_tr.query_selector('td.rowfollow').text_content()
-                        print(f'最近动向时间: {recent_time}')
-                # 获取最近动向
-                # 查找第一个包含 "最近動向"、"最近动向" 或 "最近活跃" 的元素
-                element = page.query_selector('tr:has-text("最近動向"), tr:has-text("最近动向"), tr:has-text("最近活跃"), span:has-text("最近動向"), span:has-text("最近动向"), span:has-text("最近活跃")')
-                if element:
-                    # 获取该元素的下一个同级节点
-                    next_sibling = element.evaluate('el => el.nextElementSibling')  # 获取下一个同级元素
-                    if next_sibling:
-                        # 获取下一个同级元素的文本内容
-                        next_text = next_sibling.text_content()
-                        print(f"下一个同级节点的文本：{next_text}")
-                    else:
-                        print("没有找到下一个同级节点")
-                else:
-                    print("没有找到匹配的元素")
-
-                # 每次循环结束后，关闭当前的上下文
-                context.close()
-            webkit.close()
-        except Exception as es:
-            print(time.strftime('%Y-%m-%d %H:%M:%S',time.localtime(time.time())), '发生错误，即将重启：', es)
-
-            
-        if not site_info:
-            return False, ""
-        site = site_info.get("name")
-        site_url = site_info.get("url")
-        site_cookie = site_info.get("cookie")
-        ua = site_info.get("ua")
-        render = site_info.get("render")
-        proxies = settings.PROXY if site_info.get("proxy") else None
-        proxy_server = settings.PROXY_SERVER if site_info.get("proxy") else None
-        if not site_url or not site_cookie:
-            logger.warn(f"未配置 {site} 的站点地址或Cookie，无法签到")
-            return False, ""
-        # 模拟登录
-        try:
-            # 访问链接
-            site_url = str(site_url).replace("attendance.php", "")
-            logger.info(f"开始站点模拟登录：{site}，地址：{site_url}...")
-            if render:
-                page_source = PlaywrightHelper().get_page_source(url=site_url,
-                                                                 cookies=site_cookie,
-                                                                 ua=ua,
-                                                                 proxies=proxy_server)
-                if not SiteUtils.is_logged_in(page_source):
-                    if under_challenge(page_source):
-                        return False, f"无法通过Cloudflare！"
-                    return False, f"仿真登录失败，Cookie已失效！"
-                else:
-                    return True, "模拟登录成功"
-            else:
-                res = RequestUtils(cookies=site_cookie,
-                                   ua=ua,
-                                   proxies=proxies
-                                   ).get_res(url=site_url)
-                # 判断登录状态
-                if res and res.status_code in [200, 500, 403]:
-                    if not SiteUtils.is_logged_in(res.text):
-                        if under_challenge(res.text):
-                            msg = "站点被Cloudflare防护，请打开站点浏览器仿真"
-                        elif res.status_code == 200:
-                            msg = "Cookie已失效"
+                    """
+                    尝试跳过cloudfare验证
+                    """
+                    sync_stealth(page, pure=True)
+                    page.goto(url)
+                    sync_cf_retry(page)
+                    page.wait_for_load_state('networkidle', timeout=6000)         # 等待网络请求结束
+                    page_source = page.content()
+                    # 判断是否已登录
+                    if not SiteUtils.is_logged_in(page_source):
+                        if under_challenge(page_source):
+                            result.append({'site':name,'status':f"无法通过Cloudflare！"})
+                            logger.warn(f"站点 {name} 无法通过Cloudflare！")
                         else:
-                            msg = f"状态码：{res.status_code}"
-                        logger.warn(f"{site} 模拟登录失败，{msg}")
-                        return False, f"模拟登录失败，{msg}！"
+                            result.append({'site':name,'status':f"未登录，Cookie或token已失效！"})
+                            logger.warn(f"站点 {name} 未登录，Cookie或token已失效！")
                     else:
-                        logger.info(f"{site} 模拟登录成功")
-                        return True, f"模拟登录成功"
-                elif res is not None:
-                    logger.warn(f"{site} 模拟登录失败，状态码：{res.status_code}")
-                    return False, f"模拟登录失败，状态码：{res.status_code}！"
-                else:
-                    logger.warn(f"{site} 模拟登录失败，无法打开网站")
-                    return False, f"模拟登录失败，无法打开网站！"
-        except Exception as e:
-            logger.warn("%s 模拟登录失败：%s" % (site, str(e)))
-            traceback.print_exc()
-            return False, f"模拟登录失败：{str(e)}！"
+                        # return True, "模拟登录成功"
+                        # 点击个人信息
+                        if token:
+                            page.query_selector('a[href^="/profile/detail/"]').click()
+                            '''# 查找包含"最近動向"的<tr>元素
+                            recent_tr = page.query_selector('tr:has(td:has-text("最近動向"))')
+                            if recent_tr:
+                                # 获取该行中第二个<td>的文本内容
+                                recent_time = recent_tr.query_selector('td:nth-of-type(2)').text_content()
+                                print(f'最近动向时间: {recent_time}')'''
+                        else:
+                            page.query_selector('a.User_Name, a.ExtremeUser_Name').click()
+                            '''# 查找包含“最近动向”的tr标签
+                            recent_tr = page.query_selector('tr:has(td.rowhead:has-text("最近动向"))')
+                            if recent_tr:
+                                # 获取最近动向的时间
+                                recent_time = recent_tr.query_selector('td.rowfollow').text_content()
+                                print(f'最近动向时间: {recent_time}')'''
+                        # 获取最近动向
+                        # 查找第一个包含 "最近動向"、"最近动向" 或 "最近活跃" 的元素
+                        element = page.query_selector('tr:has-text("最近動向"), tr:has-text("最近动向"), tr:has-text("最近活跃"),' + 
+                                                    'span:has-text("最近動向"), span:has-text("最近动向"), span:has-text("最近活跃")')
+                        if element:
+                            # 获取该元素的下一个同级节点
+                            next_sibling = element.evaluate('el => el.nextElementSibling')  # 获取下一个同级元素
+                            if next_sibling:
+                                # 获取下一个同级元素的文本内容
+                                next_text = next_sibling.text_content()
+                                result.append({'site':name,'status':'成功，最近动向：'+next_text})
+                                logger.info(f"站点：{name}，最近动向：{next_text}...")
+                            else:
+                                result.append({'site':name,'status':f"最近动向中未找到内容"})
+                        else:
+                            result.append({'site':name,'status':f"页面中没有最近动向元素"})
+                except Exception as e:
+                    result.append({'site':name,'status':e})
+                    logger.warn(f"站点 {name} 操作时异常：", e)
+                finally:
+                    context.close()            
+        except Exception as es:
+            logger.warn(f"发生错误，任务中止：", es)
+        finally:
+            webkit.close()
+        return result
 
     def stop_service(self):
         """
