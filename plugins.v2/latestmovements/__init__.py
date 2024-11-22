@@ -38,7 +38,7 @@ class LatestMovements(_PluginBase):
     # 插件图标
     plugin_icon = "Chrome_A.png"
     # 插件版本
-    plugin_version = "0.4"
+    plugin_version = "0.5"
     # 插件作者
     plugin_author = "jslyrd"
     # 作者主页
@@ -673,13 +673,15 @@ class LatestMovements(_PluginBase):
                                 recent_time = recent_tr.query_selector('td:nth-of-type(2)').text_content()
                                 print(f'最近动向时间: {recent_time}')'''
                         else:
-                            page.query_selector('a.User_Name, a.ExtremeUser_Name').click()
+                            page.query_selector('a.User_Name, a.PowerUser_Name').click()
                             '''# 查找包含“最近动向”的tr标签
                             recent_tr = page.query_selector('tr:has(td.rowhead:has-text("最近动向"))')
                             if recent_tr:
                                 # 获取最近动向的时间
                                 recent_time = recent_tr.query_selector('td.rowfollow').text_content()
                                 print(f'最近动向时间: {recent_time}')'''
+                        page.wait_for_timeout(3000)                                     # 等几秒再操作
+                        page.wait_for_load_state('networkidle', timeout=6000)           # 等待网络请求结束
                         # 获取最近动向
                         # 查找第一个包含 "最近動向"、"最近动向" 或 "最近活跃" 的元素
                         element = page.query_selector('tr:has-text("最近動向"), tr:has-text("最近动向"), tr:has-text("最近活跃"),' + 
