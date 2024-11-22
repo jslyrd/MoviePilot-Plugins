@@ -32,7 +32,7 @@ from app.utils.site import SiteUtils
 
 class LatestMovements(_PluginBase):
     # 插件名称
-    plugin_name = "刷新最近动向"
+    plugin_name = "刷新站点最近动向"
     # 插件描述
     plugin_desc = "强制使用浏览器模拟登录并查看最近动向，希望能达到登录的目的。大部分代码重用自thsrite的autosignin（站点自动签到）插件"
     # 插件图标
