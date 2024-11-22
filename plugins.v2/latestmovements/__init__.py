@@ -38,7 +38,7 @@ class LatestMovements(_PluginBase):
     # 插件图标
     plugin_icon = "Chrome_A.png"
     # 插件版本
-    plugin_version = "0.5"
+    plugin_version = "0.6"
     # 插件作者
     plugin_author = "jslyrd"
     # 作者主页
@@ -666,24 +666,12 @@ class LatestMovements(_PluginBase):
                         # 点击个人信息
                         if token:
                             page.query_selector('a[href^="/profile/detail/"]').click()
-                            '''# 查找包含"最近動向"的<tr>元素
-                            recent_tr = page.query_selector('tr:has(td:has-text("最近動向"))')
-                            if recent_tr:
-                                # 获取该行中第二个<td>的文本内容
-                                recent_time = recent_tr.query_selector('td:nth-of-type(2)').text_content()
-                                print(f'最近动向时间: {recent_time}')'''
                         else:
                             page.query_selector('a.User_Name, a.PowerUser_Name').click()
-                            '''# 查找包含“最近动向”的tr标签
-                            recent_tr = page.query_selector('tr:has(td.rowhead:has-text("最近动向"))')
-                            if recent_tr:
-                                # 获取最近动向的时间
-                                recent_time = recent_tr.query_selector('td.rowfollow').text_content()
-                                print(f'最近动向时间: {recent_time}')'''
                         page.wait_for_timeout(3000)                                     # 等几秒再操作
                         page.wait_for_load_state('networkidle', timeout=6000)           # 等待网络请求结束
                         # 获取最近动向
-                        # 查找第一个包含 "最近動向"、"最近动向" 或 "最近活跃" 的元素
+                        '''# 查找第一个包含 "最近動向"、"最近动向" 或 "最近活跃" 的元素
                         element = page.query_selector('tr:has-text("最近動向"), tr:has-text("最近动向"), tr:has-text("最近活跃"),' + 
                                                     'span:has-text("最近動向"), span:has-text("最近动向"), span:has-text("最近活跃")')
                         if element:
@@ -693,11 +681,37 @@ class LatestMovements(_PluginBase):
                                 # 获取下一个同级元素的文本内容
                                 next_text = next_sibling.text_content()
                                 result.append({'site':name,'status':'成功，最近动向：'+next_text})
-                                logger.info(f"站点：{name}，最近动向：{next_text}...")
+                                logger.info(f"获取成功，站点：{name}，最近动向：{next_text}...")
                             else:
                                 result.append({'site':name,'status':f"最近动向中未找到内容"})
                         else:
+                            result.append({'site':name,'status':f"页面中没有最近动向元素"})'''
+                        
+                        # 查找包含特定文本的节点
+                        texts = ['最近動向', '最近动向', '最近活跃']
+                        target_element = None                        
+                        for text in texts:
+                            try:
+                                target_element = page.query_selector(f'*:text("{text}")')
+                                if target_element:
+                                    break
+                            except Exception as e:
+                                # 忽略未找到元素的异常，继续尝试下一个文本
+                                pass                        
+                        if not target_element:
                             result.append({'site':name,'status':f"页面中没有最近动向元素"})
+                        else:
+                        # 获取下一个兄弟节点并输出其文本内容
+                            try:
+                                next_sibling = target_element.next_element_sibling()
+                                if next_sibling:
+                                    next_text = next_sibling.text_content()
+                                    result.append({'site':name,'status':'成功，最近动向：'+next_text})
+                                    logger.info(f"获取成功，站点：{name}，最近动向：{next_text}...")
+                                else:
+                                    result.append({'site':name,'status':f"最近动向中未找到内容"})
+                            except Exception as e:
+                                logger.warn(f"获取兄弟节点中的最近动向错误，站点 {name} 操作时异常：", e)
                 except Exception as e:
                     result.append({'site':name,'status':e})
                     logger.warn(f"站点 {name} 操作时异常：", e)
