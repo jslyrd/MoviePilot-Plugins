@@ -38,7 +38,7 @@ class LatestMovements(_PluginBase):
     # 插件图标
     plugin_icon = "Chrome_A.png"
     # 插件版本
-    plugin_version = "0.7"
+    plugin_version = "0.8"
     # 插件作者
     plugin_author = "jslyrd"
     # 作者主页
@@ -641,6 +641,8 @@ class LatestMovements(_PluginBase):
                         page.set_extra_http_headers({"cookie": cookie})
                     if token:
                         page.set_extra_http_headers({"Authorization": token})
+                        page.set_extra_http_headers({"visitorId": 'b8048cba58ad6b38f262efc716c13e2b'})
+                        
                         
                     # context.add_cookies(site_info.get("cookie"))
                     page.route(re.compile(r"(\.png)|(\.jpg)"), lambda route: route.abort())         # 不加载图片
