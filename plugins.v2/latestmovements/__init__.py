@@ -39,7 +39,7 @@ class LatestMovements(_PluginBase):
     # 插件图标
     plugin_icon = "Chrome_A.png"
     # 插件版本
-    plugin_version = "0.94"
+    plugin_version = "1.0.0"
     # 插件作者
     plugin_author = "jslyrd"
     # 作者主页
