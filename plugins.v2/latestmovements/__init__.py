@@ -8,6 +8,7 @@ from typing import Any, List, Dict, Tuple, Optional
 
 from playwright.sync_api import sync_playwright as playwright   # pip install playwright && python -m playwright install
 from cf_clearance import sync_cf_retry, sync_stealth
+import os
 
 import pytz
 from apscheduler.schedulers.background import BackgroundScheduler
@@ -38,7 +39,7 @@ class LatestMovements(_PluginBase):
     # 插件图标
     plugin_icon = "Chrome_A.png"
     # 插件版本
-    plugin_version = "0.8"
+    plugin_version = "0.9"
     # 插件作者
     plugin_author = "jslyrd"
     # 作者主页
@@ -613,6 +614,7 @@ class LatestMovements(_PluginBase):
         :param site_info: 站点信息
         :return: 签到结果信息
         """
+        stealth_js_path = '/moviepilot/.cache/ms-playwright/chromium-1076/chrome-linux/stealth.min.js'
         logger.info(f"启动浏览器，本次更新动向的站点为：{str(do_sites)}")
         result = []
         try:  
@@ -635,8 +637,15 @@ class LatestMovements(_PluginBase):
                 try:
                     logger.info(f"开始站点操作：{name}，添加ua、代理、cookie...")
                     context = webkit.new_context(user_agent=ua, 
+                                                args=['--disable-blink-features=AutomationControlled'], # 加一个防无头检测
                                                 proxy=settings.PROXY_SERVER if is_proxy else None)  # 需要创建一个 context 上下文
-                    page = context.new_page()  # 创建一个新的页面   
+                    if os.path.exists(stealth_js_path):
+                        # 加载过爬虫检测的js，需在https://cdn.jsdelivr.net/gh/requireCool/stealth.min.js/下载并放到映射的对应文件夹中
+                        context.add_init_script(path=stealth_js_path)
+                        logger.info(f"加载防爬虫检测插件完成...")
+                    page = context.new_page()  # 创建一个新的页面
+                    # 设置网页大小也可以防止无头浏览器被检测
+                    page.set_viewport_size({'width': 1920, 'height': 1080})
                     if cookie:
                         page.set_extra_http_headers({"cookie": cookie})
                     if token:
@@ -648,12 +657,14 @@ class LatestMovements(_PluginBase):
                     page.route(re.compile(r"(\.png)|(\.jpg)"), lambda route: route.abort())         # 不加载图片
                     logger.info(f"开始站点模拟登录：{name}，地址：{url}...")
                     
+                    page.goto(url)
                     """
                     尝试跳过cloudfare验证
-                    """
                     sync_stealth(page, pure=True)
                     page.goto(url)
                     sync_cf_retry(page)
+                    """
+                    page.wait_for_timeout(6000)                                     # 等几秒再操作
                     page.wait_for_load_state('networkidle', timeout=6000)         # 等待网络请求结束
                     page_source = page.content()
                     # 判断是否已登录
