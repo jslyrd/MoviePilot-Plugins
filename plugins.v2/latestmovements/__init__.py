@@ -39,7 +39,7 @@ class LatestMovements(_PluginBase):
     # 插件图标
     plugin_icon = "Chrome_A.png"
     # 插件版本
-    plugin_version = "0.9"
+    plugin_version = "0.91"
     # 插件作者
     plugin_author = "jslyrd"
     # 作者主页
@@ -619,7 +619,10 @@ class LatestMovements(_PluginBase):
         result = []
         try:  
             pw =  playwright().start()                      # 不使用with，有效防止内存爆炸
-            webkit = pw.chromium.launch(headless=True, channel='chromium')        # headless=False表示无头模式 
+            webkit = pw.chromium.launch(headless=True,
+                                        bypass_csp=True,
+                                        args=['--disable-blink-features=AutomationControlled'], # 加一个防无头检测
+                                        channel='chromium')        # headless=False表示无头模式 
             for site_info in do_sites:
                 logger.info(f"轮询站点：{site_info.get('name')}")
                 if not site_info:
@@ -637,7 +640,6 @@ class LatestMovements(_PluginBase):
                 try:
                     logger.info(f"开始站点操作：{name}，添加ua、代理、cookie...")
                     context = webkit.new_context(user_agent=ua, 
-                                                args=['--disable-blink-features=AutomationControlled'], # 加一个防无头检测
                                                 proxy=settings.PROXY_SERVER if is_proxy else None)  # 需要创建一个 context 上下文
                     if os.path.exists(stealth_js_path):
                         # 加载过爬虫检测的js，需在https://cdn.jsdelivr.net/gh/requireCool/stealth.min.js/下载并放到映射的对应文件夹中
