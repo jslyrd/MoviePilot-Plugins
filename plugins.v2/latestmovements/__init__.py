@@ -39,7 +39,7 @@ class LatestMovements(_PluginBase):
     # 插件图标
     plugin_icon = "Chrome_A.png"
     # 插件版本
-    plugin_version = "0.93"
+    plugin_version = "0.94"
     # 插件作者
     plugin_author = "jslyrd"
     # 作者主页
@@ -668,11 +668,11 @@ class LatestMovements(_PluginBase):
                     page.goto(url)
                     sync_cf_retry(page)
                     """
-                    page.wait_for_timeout(6000)                                     # 等几秒再操作
+                    page.wait_for_timeout(8000)                                     # 等几秒再操作
                     page.wait_for_load_state('networkidle', timeout=6000)         # 等待网络请求结束
                     page_source = page.content()
                     # 判断是否已登录
-                    if not SiteUtils.is_logged_in(page_source):
+                    if not SiteUtils.is_logged_in(page_source) and not token:
                         if under_challenge(page_source):
                             result.append({'site':name,'status':f"无法通过Cloudflare！"})
                             logger.warn(f"站点 {name} 无法通过Cloudflare！")
