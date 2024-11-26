@@ -39,7 +39,7 @@ class LatestMovements(_PluginBase):
     # 插件图标
     plugin_icon = "Chrome_A.png"
     # 插件版本
-    plugin_version = "1.0.0"
+    plugin_version = "1.0.1"
     # 插件作者
     plugin_author = "jslyrd"
     # 作者主页
@@ -621,9 +621,7 @@ class LatestMovements(_PluginBase):
             pw =  playwright().start()                      # 不使用with，有效防止内存爆炸
             logger.info(f"启动浏览器，加载浏览器参数...")
             webkit = pw.chromium.launch(headless=True,
-                                        args=['--disable-features=IsolateOrigins,site-per-process', '--disable-blink-features=AutomationControlled'], # 加一个防无头检测
-                                        slowMo=1000,
-                                        env={},
+                                        args=['--disable-blink-features=AutomationControlled'], # 加一个防无头检测
                                         channel='chromium')        # headless=False表示无头模式 
             for site_info in do_sites:
                 logger.info(f"轮询站点：{site_info.get('name')}")
