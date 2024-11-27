@@ -8,7 +8,7 @@ from typing import Any, List, Dict, Tuple, Optional
 
 from playwright.sync_api import sync_playwright as playwright   # pip install playwright && python -m playwright install
 from cf_clearance import sync_cf_retry, sync_stealth
-import os
+import os, random
 
 import pytz
 from apscheduler.schedulers.background import BackgroundScheduler
@@ -39,7 +39,7 @@ class LatestMovements(_PluginBase):
     # 插件图标
     plugin_icon = "Chrome_A.png"
     # 插件版本
-    plugin_version = "1.0.1"
+    plugin_version = "1.0.2"
     # 插件作者
     plugin_author = "jslyrd"
     # 作者主页
@@ -620,9 +620,9 @@ class LatestMovements(_PluginBase):
         try:  
             pw =  playwright().start()                      # 不使用with，有效防止内存爆炸
             logger.info(f"启动浏览器，加载浏览器参数...")
-            webkit = pw.chromium.launch(headless=True,
+            webkit = pw.chromium.launch(headless=True,        # headless=False表示无头模式 
                                         args=['--disable-blink-features=AutomationControlled'], # 加一个防无头检测
-                                        channel='chromium')        # headless=False表示无头模式 
+                                        channel='chromium')
             for site_info in do_sites:
                 logger.info(f"轮询站点：{site_info.get('name')}")
                 if not site_info:
@@ -651,12 +651,22 @@ class LatestMovements(_PluginBase):
                     if cookie:
                         page.set_extra_http_headers({"cookie": cookie})
                     if token:
-                        page.set_extra_http_headers({"Authorization": token})
-                        page.set_extra_http_headers({"visitorId": 'b8048cba58ad6b38f262efc716c13e2b'})
+                        page.set_extra_http_headers({"Authorization": token,
+                                                    "visitorId": ''.join(random.choices('abcdef0123456789', k=32)),
+                                                    "webVersion": 1010,
+                                                    "version": "1.0.1",
+                                                    "TE": "trailers",
+                                                    "Sec-Fetch-Site":"same-site",
+                                                    "Sec-Fetch-Mode": "cors",
+                                                    "Sec-Fetch-Dest": "empty",
+                                                    "Referer": url,
+                                                    "Origin": url,
+                                                    })
+
                         
                         
                     # context.add_cookies(site_info.get("cookie"))
-                    page.route(re.compile(r"(\.png)|(\.jpg)"), lambda route: route.abort())         # 不加载图片
+                    # page.route(re.compile(r"(\.png)|(\.jpg)"), lambda route: route.abort())         # 不加载图片
                     logger.info(f"开始站点模拟登录：{name}，地址：{url}...")
                     
                     page.goto(url)
@@ -681,35 +691,22 @@ class LatestMovements(_PluginBase):
                         logger.info(f"站点模拟登录成功：{name}，开始访问个人主页...")
                         # return True, "模拟登录成功"
                         # 点击个人信息
-                        if token:
+                        if name == "朱雀":
+                            page.goto('https://zhuque.in/user/info/')
+                        elif token:
                             page.query_selector('a[href^="/profile/detail/"]').click()
                         else:
                             page.query_selector('a.User_Name, a.PowerUser_Name').click()
                         page.wait_for_timeout(3000)                                     # 等几秒再操作
                         page.wait_for_load_state('networkidle', timeout=6000)           # 等待网络请求结束
-                        # 获取最近动向
-                        '''# 查找第一个包含 "最近動向"、"最近动向" 或 "最近活跃" 的元素
-                        element = page.query_selector('tr:has-text("最近動向"), tr:has-text("最近动向"), tr:has-text("最近活跃"),' + 
-                                                    'span:has-text("最近動向"), span:has-text("最近动向"), span:has-text("最近活跃")')
-                        if element:
-                            # 获取该元素的下一个同级节点
-                            next_sibling = element.evaluate('el => el.nextElementSibling')  # 获取下一个同级元素
-                            if next_sibling:
-                                # 获取下一个同级元素的文本内容
-                                next_text = next_sibling.text_content()
-                                result.append({'site':name,'status':'成功，最近动向：'+next_text})
-                                logger.info(f"获取成功，站点：{name}，最近动向：{next_text}...")
-                            else:
-                                result.append({'site':name,'status':f"最近动向中未找到内容"})
-                        else:
-                            result.append({'site':name,'status':f"页面中没有最近动向元素"})'''                        
+                        # 获取最近动向                       
                         logger.info(f"开始获取最近动向...")
                         # 查找包含特定文本的节点
                         texts = ['最近動向', '最近动向', '最近活跃']
                         target_element = None                        
                         for text in texts:
                             try:
-                                target_element = page.query_selector(f'*:text("{text}")')
+                                target_element = page.get_by_text(text)
                                 if target_element:                                    
                                     logger.info(f"查找最近动向元素成功：{name}...")
                                     break
@@ -723,7 +720,8 @@ class LatestMovements(_PluginBase):
                         # 获取下一个兄弟节点并输出其文本内容
                             logger.info(f"提取最近动向...")
                             try:
-                                next_sibling = target_element.next_element_sibling()
+                                parent = page.get_by_role("listitem").filter(has=target_element)    # 获取父元素
+                                next_sibling = parent.query_selector_all(':scope > *')[1]  # `:scope > *` 选择器匹配直接子元素,用[1]获取第二个
                                 if next_sibling:
                                     next_text = next_sibling.text_content()
                                     result.append({'site':name,'status':'成功，最近动向：'+next_text})
