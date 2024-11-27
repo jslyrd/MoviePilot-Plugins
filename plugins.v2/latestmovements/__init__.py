@@ -39,7 +39,7 @@ class LatestMovements(_PluginBase):
     # 插件图标
     plugin_icon = "Chrome_A.png"
     # 插件版本
-    plugin_version = "1.0.2"
+    plugin_version = "1.0.3"
     # 插件作者
     plugin_author = "jslyrd"
     # 作者主页
@@ -653,7 +653,7 @@ class LatestMovements(_PluginBase):
                     if token:
                         page.set_extra_http_headers({"Authorization": token,
                                                     "visitorId": ''.join(random.choices('abcdef0123456789', k=32)),
-                                                    "webVersion": 1010,
+                                                    "webVersion": "1010",
                                                     "version": "1.0.1",
                                                     "TE": "trailers",
                                                     "Sec-Fetch-Site":"same-site",
@@ -708,7 +708,7 @@ class LatestMovements(_PluginBase):
                             try:
                                 target_element = page.get_by_text(text)
                                 if target_element:                                    
-                                    logger.info(f"查找最近动向元素成功：{name}...")
+                                    logger.info(f"查找最近动向元素成功：{name},{text}...")
                                     break
                             except Exception as e:
                                 # 忽略未找到元素的异常，继续尝试下一个文本
@@ -720,7 +720,7 @@ class LatestMovements(_PluginBase):
                         # 获取下一个兄弟节点并输出其文本内容
                             logger.info(f"提取最近动向...")
                             try:
-                                parent = page.get_by_role("listitem").filter(has=target_element)    # 获取父元素
+                                parent = target_element.locator('xpath=..')    # 获取父元素
                                 next_sibling = parent.query_selector_all(':scope > *')[1]  # `:scope > *` 选择器匹配直接子元素,用[1]获取第二个
                                 if next_sibling:
                                     next_text = next_sibling.text_content()
