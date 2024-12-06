@@ -3,11 +3,12 @@
         "name": "刷新站点最近动向",
         "description": "自用。强制使用浏览器模拟登录并查看最近动向。代码和框架重用自thsrite的autosignin（站点自动签到）插件",
         "labels": "站点",
-        "version": "1.0.5",
+        "version": "1.0.6",
         "icon": "Chrome_A.png",
         "author": "thsrite,jslyrd",
         "level": 2,
         "history": {
+            "v1.0.6": "修复数据显示问题",
             "v1.0.1": "修复浏览器启动失败问题",
             "v1.0.0": "除馒头外应该都可用了，但数据显示还有问题",
             "v0.91": "MoviePilot V2 刷新站点最近动向0.91馒头",

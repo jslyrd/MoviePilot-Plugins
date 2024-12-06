@@ -39,7 +39,7 @@ class LatestMovements(_PluginBase):
     # 插件图标
     plugin_icon = "Chrome_A.png"
     # 插件版本
-    plugin_version = "1.0.5"
+    plugin_version = "1.0.6"
     # 插件作者
     plugin_author = "jslyrd"
     # 作者主页
@@ -699,10 +699,10 @@ class LatestMovements(_PluginBase):
                     # 判断是否已登录
                     if not SiteUtils.is_logged_in(page_source):
                         if under_challenge(page_source):
-                            result.append({'site':name,'status':f"无法通过Cloudflare！"})
+                            result.append([[name],[f"无法通过Cloudflare！"]])
                             logger.warn(f"站点 {name} 无法通过Cloudflare！")
                         else:
-                            result.append({'site':name,'status':f"未登录，Cookie或token已失效！"})
+                            result.append([[name],[f"未登录，Cookie或token已失效！"]])
                             logger.warn(f"站点 {name} 未登录，Cookie或token已失效！")
                     else:                        
                         logger.info(f"站点模拟登录成功：{name}，开始访问个人主页...")
@@ -728,7 +728,7 @@ class LatestMovements(_PluginBase):
                                 # 忽略未找到元素的异常，继续尝试下一个文本
                                 pass                       
                         if not target_element:
-                            result.append({'site':name,'status':f"页面中没有最近动向元素"})
+                            result.append([[name],[f"页面中没有最近动向元素"]])
                             logger.info(f"页面中没有最近动向元素...")
                         else:
                         # 获取下一个兄弟节点并输出其文本内容
@@ -736,14 +736,14 @@ class LatestMovements(_PluginBase):
                             try:
                                 next_text = target_element.locator("xpath=/parent::*/child::*[2]").text_content(timeout=3000)
                                 if next_text:
-                                    result.append({'site':name,'status':next_text})
+                                    result.append([[name],[next_text]])
                                     logger.info(f"获取成功，站点：{name}，最近动向：{next_text}...")
                                 else:
-                                    result.append({'site':name,'status':f"最近动向中未找到内容"})
+                                    result.append([[name],[f"最近动向中未找到内容"]])
                             except Exception as e:
                                 logger.warn(f"获取兄弟节点中的最近动向错误，站点 {name} 操作时异常：", e)
                 except Exception as e:
-                    result.append({'site':name,'status':e})
+                    result.append([[name],[e]])
                     logger.warn(f"站点 {name} 操作时异常：", e)
                 finally:   
                     # 关闭当前标签页
