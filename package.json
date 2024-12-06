@@ -3,7 +3,7 @@
         "name": "刷新站点最近动向",
         "description": "强制使用浏览器模拟登录并查看最近动向。代码和框架重用自thsrite的autosignin（站点自动签到）插件",
         "labels": "站点",
-        "version": "1.0.4",
+        "version": "1.0.5",
         "icon": "Chrome_A.png",
         "author": "thsrite,jslyrd",
         "level": 3,

@@ -39,7 +39,7 @@ class LatestMovements(_PluginBase):
     # 插件图标
     plugin_icon = "Chrome_A.png"
     # 插件版本
-    plugin_version = "1.0.4"
+    plugin_version = "1.0.5"
     # 插件作者
     plugin_author = "jslyrd"
     # 作者主页
@@ -615,7 +615,7 @@ class LatestMovements(_PluginBase):
         :return: 签到结果信息
         """
         stealth_js_path = '/moviepilot/.cache/ms-playwright/chromium-1076/chrome-linux/stealth.min.js'
-        logger.info(f"启动浏览器，本次更新动向的站点为：{str(do_sites)}")
+        logger.info(f"启动浏览器，本次更新动向的站点有{len(do_sites)}个")
         result = []
         try:  
             pw =  playwright().start()                      # 不使用with，有效防止内存爆炸
@@ -623,7 +623,7 @@ class LatestMovements(_PluginBase):
             webkit = pw.chromium.launch(headless=True,        # headless=False表示无头模式 
                                         args=['--disable-blink-features=AutomationControlled'], # 加一个防无头检测
                                         channel='chromium')
-            context = webkit.new_context(user_agent=ua, 
+            context = webkit.new_context(user_agent=do_sites[0].get("ua"), 
                                         ignore_https_errors=True,
                                         proxy=settings.PROXY_SERVER if is_proxy else None
                                         )  # 需要创建一个 context 上下文
