@@ -39,7 +39,7 @@ class LatestMovements(_PluginBase):
     # 插件图标
     plugin_icon = "Chrome_A.png"
     # 插件版本
-    plugin_version = "1.0.3"
+    plugin_version = "1.0.4"
     # 插件作者
     plugin_author = "jslyrd"
     # 作者主页
@@ -513,7 +513,7 @@ class LatestMovements(_PluginBase):
         # 执行任务
         logger.info(f"开始执行{type_str}任务 ...")
         status = self.login_site(do_sites)
-        logger.info(f"执行{type_str}任务结束，任务结果：{status} ...")
+        # logger.info(f"执行{type_str}任务结束，任务结果：{status} ...")
         if status:
             logger.info(f"站点{type_str}任务完成！")
             # 获取今天的日期
@@ -623,6 +623,15 @@ class LatestMovements(_PluginBase):
             webkit = pw.chromium.launch(headless=True,        # headless=False表示无头模式 
                                         args=['--disable-blink-features=AutomationControlled'], # 加一个防无头检测
                                         channel='chromium')
+            context = webkit.new_context(user_agent=ua, 
+                                        ignore_https_errors=True,
+                                        proxy=settings.PROXY_SERVER if is_proxy else None
+                                        )  # 需要创建一个 context 上下文
+            if os.path.exists(stealth_js_path):
+                # 加载过爬虫检测的js，需在https://cdn.jsdelivr.net/gh/requireCool/stealth.min.js/下载并放到映射的对应文件夹中
+                context.add_init_script(path=stealth_js_path)
+                logger.info(f"加载防爬虫检测插件完成...")
+            page_base = context.new_page()  # 创建一个基础页面,
             for site_info in do_sites:
                 logger.info(f"轮询站点：{site_info.get('name')}")
                 if not site_info:
@@ -639,12 +648,6 @@ class LatestMovements(_PluginBase):
                     continue
                 try:
                     logger.info(f"开始站点操作：{name}，添加ua、代理、cookie...")
-                    context = webkit.new_context(user_agent=ua, 
-                                                proxy=settings.PROXY_SERVER if is_proxy else None)  # 需要创建一个 context 上下文
-                    if os.path.exists(stealth_js_path):
-                        # 加载过爬虫检测的js，需在https://cdn.jsdelivr.net/gh/requireCool/stealth.min.js/下载并放到映射的对应文件夹中
-                        context.add_init_script(path=stealth_js_path)
-                        logger.info(f"加载防爬虫检测插件完成...")
                     page = context.new_page()  # 创建一个新的页面
                     # 设置网页大小也可以防止无头浏览器被检测
                     page.set_viewport_size({'width': 1920, 'height': 1080})
@@ -653,34 +656,48 @@ class LatestMovements(_PluginBase):
                     if token:
                         page.set_extra_http_headers({"Authorization": token,
                                                     "visitorId": ''.join(random.choices('abcdef0123456789', k=32)),
-                                                    "webVersion": "1010",
-                                                    "version": "1.0.1",
-                                                    "TE": "trailers",
-                                                    "Sec-Fetch-Site":"same-site",
-                                                    "Sec-Fetch-Mode": "cors",
-                                                    "Sec-Fetch-Dest": "empty",
-                                                    "Referer": url,
-                                                    "Origin": url,
+                                                    # "TE": "trailers", # 这个有问题
                                                     })
+                        local_storage_data = {"apiHost":"https://api2.m-team.cc/api",
+                                            "auth":token,
+                                            "lastCheckTime":"1733412036157",
+                                            "user.setLastCheck4news":'{"322359":"2024-09-21 00:15:18"}',
+                                            "user.setLastUpdate":'{"data":{"count":"0","unMake":"0"},"lastTime":1733412038023}',
+                                            "user.setPeerCount":'{"data":{"seeder":"381","leecher":"0"},"lastTime":1733412038110}',
+                                            "user.setSystemMsgStatic":'{"data":{"count":"67","unMake":"0"},"lastTime":1733412037930}',
+                                            }                    
+                        # 设置本地存储数据
+                        page.wait_for_timeout(10000) 
+                        page.goto(url)
+                        page.wait_for_load_state('networkidle', timeout=30000)         # 等待网络请求结束
+                        for key, value in local_storage_data.items():
+                            page.evaluate(f"localStorage.setItem('{key}', '{value}')")
 
+                        js1 = '''() =>{                    
+                            Object.defineProperties(navigator,{
+                            webdriver:{
+                                get: () => false
+                                }
+                            })
+                        }'''
                         
-                        
+                        js2 = '''() => {
+                            alert (
+                                window.navigator.webdriver
+                            )
+                        }'''
+                        page.evaluate(js1)
+                        page.evaluate(js2)
                     # context.add_cookies(site_info.get("cookie"))
                     # page.route(re.compile(r"(\.png)|(\.jpg)"), lambda route: route.abort())         # 不加载图片
                     logger.info(f"开始站点模拟登录：{name}，地址：{url}...")
-                    
+                    page.wait_for_timeout(1000) 
                     page.goto(url)
-                    """
-                    尝试跳过cloudfare验证
-                    sync_stealth(page, pure=True)
-                    page.goto(url)
-                    sync_cf_retry(page)
-                    """
                     page.wait_for_timeout(8000)                                     # 等几秒再操作
-                    page.wait_for_load_state('networkidle', timeout=6000)         # 等待网络请求结束
+                    page.wait_for_load_state('networkidle', timeout=30000)         # 等待网络请求结束
                     page_source = page.content()
                     # 判断是否已登录
-                    if not SiteUtils.is_logged_in(page_source) and not token:
+                    if not SiteUtils.is_logged_in(page_source):
                         if under_challenge(page_source):
                             result.append({'site':name,'status':f"无法通过Cloudflare！"})
                             logger.warn(f"站点 {name} 无法通过Cloudflare！")
@@ -693,26 +710,23 @@ class LatestMovements(_PluginBase):
                         # 点击个人信息
                         if name == "朱雀":
                             page.goto('https://zhuque.in/user/info/')
-                        elif token:
-                            page.query_selector('a[href^="/profile/detail/"]').click()
-                        else:
-                            page.query_selector('a.User_Name, a.PowerUser_Name').click()
+                        page.locator("xpath=(//a[contains(@href, 'userdetails.php?id=') or contains(@href, '/user/info/') or contains(@href, '/profile/detail/')])[1]").click()
                         page.wait_for_timeout(3000)                                     # 等几秒再操作
-                        page.wait_for_load_state('networkidle', timeout=6000)           # 等待网络请求结束
+                        page.wait_for_load_state('networkidle', timeout=30000)           # 等待网络请求结束
                         # 获取最近动向                       
                         logger.info(f"开始获取最近动向...")
                         # 查找包含特定文本的节点
-                        texts = ['最近動向', '最近动向', '最近活跃']
+                        texts = ['最近动向', '最近動向', '最近活跃']
                         target_element = None                        
                         for text in texts:
                             try:
-                                target_element = page.get_by_text(text)
-                                if target_element:                                    
+                                target_element = page.locator(f"xpath=(//*[contains(text(), '{text}')])[1]")
+                                if text in target_element.text_content(timeout=3000):                                    
                                     logger.info(f"查找最近动向元素成功：{name},{text}...")
                                     break
                             except Exception as e:
                                 # 忽略未找到元素的异常，继续尝试下一个文本
-                                pass                        
+                                pass                       
                         if not target_element:
                             result.append({'site':name,'status':f"页面中没有最近动向元素"})
                             logger.info(f"页面中没有最近动向元素...")
@@ -720,11 +734,9 @@ class LatestMovements(_PluginBase):
                         # 获取下一个兄弟节点并输出其文本内容
                             logger.info(f"提取最近动向...")
                             try:
-                                parent = target_element.locator('xpath=..')    # 获取父元素
-                                next_sibling = parent.query_selector_all(':scope > *')[1]  # `:scope > *` 选择器匹配直接子元素,用[1]获取第二个
-                                if next_sibling:
-                                    next_text = next_sibling.text_content()
-                                    result.append({'site':name,'status':'成功，最近动向：'+next_text})
+                                next_text = target_element.locator("xpath=/parent::*/child::*[2]").text_content(timeout=3000)
+                                if next_text:
+                                    result.append({'site':name,'status':next_text})
                                     logger.info(f"获取成功，站点：{name}，最近动向：{next_text}...")
                                 else:
                                     result.append({'site':name,'status':f"最近动向中未找到内容"})
@@ -733,12 +745,15 @@ class LatestMovements(_PluginBase):
                 except Exception as e:
                     result.append({'site':name,'status':e})
                     logger.warn(f"站点 {name} 操作时异常：", e)
-                finally:
-                    context.close()            
+                finally:   
+                    # 关闭当前标签页
+                    if page:
+                        page.close()          
         except Exception as es:
             logger.warn(f"发生错误，任务中止：", es)
         finally:
-            webkit.close()        
+            if webkit:
+                webkit.close()     
         logger.info(f"浏览器操作完成...获取结果：{result}")
         return result
 
