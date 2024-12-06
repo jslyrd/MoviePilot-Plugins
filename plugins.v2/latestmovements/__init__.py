@@ -39,7 +39,7 @@ class LatestMovements(_PluginBase):
     # 插件图标
     plugin_icon = "Chrome_A.png"
     # 插件版本
-    plugin_version = "1.0.6"
+    plugin_version = "1.0.7"
     # 插件作者
     plugin_author = "jslyrd"
     # 作者主页
@@ -625,7 +625,7 @@ class LatestMovements(_PluginBase):
                                         channel='chromium')
             context = webkit.new_context(user_agent=do_sites[0].get("ua"), 
                                         ignore_https_errors=True,
-                                        proxy=settings.PROXY_SERVER if is_proxy else None
+                                        proxy=settings.PROXY_SERVER if do_sites[0].get("proxy") else None
                                         )  # 需要创建一个 context 上下文
             if os.path.exists(stealth_js_path):
                 # 加载过爬虫检测的js，需在https://cdn.jsdelivr.net/gh/requireCool/stealth.min.js/下载并放到映射的对应文件夹中
